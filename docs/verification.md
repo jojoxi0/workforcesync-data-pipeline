@@ -14,6 +14,15 @@ Validated on 2026-09-19 with Python 3.13.15 and portable PostgreSQL 17.11 on Win
 
 The installed FastAPI/Starlette stack emits test-client deprecation warnings; tests pass. These warnings are dependency compatibility notices, not suppressed failures.
 
-Docker Engine/Desktop was not installed on the development host. Therefore local Docker startup is not claimed. The GitHub workflow includes a clean Compose build/start, migration, seed, initial/incremental/unchanged runs, controlled failure/recovery, and SQL execution. Its actual result must be checked in GitHub Actions; configuration alone is not runtime proof.
+Docker Engine/Desktop was not installed on the development host. Container validation was completed on GitHub's Ubuntu runner instead. [CI run 35466837133](https://github.com/jojoxi0/workforcesync-data-pipeline/actions/runs/35466837133) passed on 2026-09-19 against implementation commit `80c807581dd0f27ef4631860826bb04f5088a357`:
+
+- Locked dependency installation, all 39 tests, lint, formatting, migration round trip and package build.
+- Actual HTTP extraction and Prefect orchestration smoke test.
+- Clean Docker Compose build/start, migration and seed.
+- Initial, incremental and unchanged-source pipeline executions inside containers.
+- Expected nonzero controlled load failure followed by successful recovery.
+- All analytics SQL queries inside the container environment.
+
+The subsequent documentation-only commit records this result; it does not change the tested implementation.
 
 Recorded application run data is in `examples/runs.json`. Durations are observational and not benchmarks. The snapshot protocol assumes source clock monotonicity and full tombstones; observed employment history is not an event-complete CDC log.

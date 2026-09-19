@@ -1,5 +1,7 @@
 # WorkforceSync
 
+[![CI](https://github.com/jojoxi0/workforcesync-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/jojoxi0/workforcesync-data-pipeline/actions/workflows/ci.yml)
+
 A production-style portfolio project simulating workforce analytics ingestion. It reads a paginated REST source, cleans records with Python and Pandas, quarantines invalid data, and incrementally maintains a PostgreSQL warehouse.
 
 The engineering problem is keeping people, employments, and classifications consistent across daily loads without losing changes, duplicating rows, or reporting a failed load as successful.
@@ -139,4 +141,4 @@ No illustrative screenshots are presented as execution proof. Open the running A
 
 This is polling CDC, not WAL-based replication. Source tombstones must retain full record fields. Multiple changes between snapshots collapse to the latest state, so observed history is not a complete event ledger. Deleted parents remain for historical foreign keys; current headcount queries exclude them. Quarantined records need a source correction with a fresh timestamp or a full replay after changing validation rules.
 
-The local simulator shares a PostgreSQL instance with the warehouse, has no authentication, and contains only synthetic data. It is intended for local review. There is no automatic retention, source-clock rollback recovery, or crash-reconciliation daemon. Docker was unavailable on the development host; native PostgreSQL 17 and HTTP/Prefect execution were tested, while the included CI performs the container checks. See [verification](docs/verification.md) for the precise validation record.
+The local simulator shares a PostgreSQL instance with the warehouse, has no authentication, and contains only synthetic data. It is intended for local review. There is no automatic retention, source-clock rollback recovery, or crash-reconciliation daemon. Native PostgreSQL 17 and HTTP/Prefect execution passed locally, and the clean Docker Compose demonstration passed in GitHub Actions. See [verification](docs/verification.md) for the precise validation record.
