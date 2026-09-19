@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "workforcesync"
+version = "0.1.0"
+description = "Incremental workforce ingestion with an observable PostgreSQL warehouse"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "httpx>=0.28,<1",
+  "pandas>=2.2,<3", "psycopg[binary]>=3.2,<4", "alembic>=1.15,<2",
+  "sqlalchemy>=2.0,<3", "pydantic-settings>=2.8,<3", "prefect>=3.4,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9", "ruff>=0.11,<1"]
+
+[project.scripts]
+workforcesync = "workforcesync.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/workforcesync", "api", "orchestration"]
+
+[tool.hatch.build]
+dev-mode-dirs = [".", "src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires a migrated PostgreSQL test database"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".local"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
