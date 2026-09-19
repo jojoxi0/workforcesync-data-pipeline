@@ -1,0 +1,84 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: workforcesync_test
+          POSTGRES_USER: workforcesync
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U workforcesync -d workforcesync_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: workforcesync_test
+      POSTGRES_USER: workforcesync
+      POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      TEST_POSTGRES_DB: workforcesync_test
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --frozen --extra dev
+      - run: uv run ruff check . && uv run ruff format --check .
+      - name: Exercise migration round trip
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+      - run: uv run pytest -q
+      - run: uv build
+      - name: Real HTTP and Prefect smoke test
+        run: |
+          uv run uvicorn api.main:app --host 127.0.0.1 --port 8000 > /tmp/source.log 2>&1 &
+          source_pid=$!
+          trap 'kill "$source_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then break; fi
+            sleep 1
+          done
+          uv run workforcesync seed
+          uv run workforcesync pipeline --full
+          uv run python scripts/run_analytics.py
+      - name: Clean Docker Compose demonstration
+        env:
+          POSTGRES_PORT: 5433
+          POSTGRES_DB: workforcesync_container
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          keys = ('POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD')
+          Path('.env').write_text('\n'.join(f'{key}={os.environ[key]}' for key in keys) + '\n')
+          PY
+          docker compose config --quiet
+          docker compose up -d --build
+          docker compose run --rm runner alembic upgrade head
+          docker compose run --rm runner workforcesync seed
+          docker compose run --rm runner workforcesync pipeline --full
+          docker compose run --rm runner workforcesync seed --scenario incremental
+          docker compose run --rm runner workforcesync pipeline
+          docker compose run --rm runner workforcesync pipeline
+          if docker compose run --rm runner workforcesync pipeline --fail-at load; then
+            echo 'Expected failure command unexpectedly succeeded'
+            exit 1
+          fi
+          docker compose run --rm runner workforcesync pipeline
+          docker compose run --rm runner python scripts/run_analytics.py
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop demonstration containers
+        if: always()
+        run: docker compose down
